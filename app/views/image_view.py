@@ -11,29 +11,35 @@ class ImagePanel(ttk.Frame):
     """Панель с заголовком, Canvas + скроллбары и кнопками масштаба."""
 
     def __init__(self, parent, title: str) -> None:
-        super().__init__(parent)
+        super().__init__(parent, style="Panel.TFrame", padding=(10, 8))
         self._pil: Image.Image | None = None
         self._photo: ImageTk.PhotoImage | None = None
         self._zoom: float = 1.0
         self._fit: bool = True
 
-        header = ttk.Frame(self)
-        header.pack(fill="x", padx=4, pady=(4, 0))
+        header = ttk.Frame(self, style="Panel.TFrame")
+        header.pack(fill="x", pady=(0, 4))
         ttk.Label(header, text=title, style="PanelTitle.TLabel").pack(side="left")
-        btns = ttk.Frame(header)
-        btns.pack(side="right")
-        ttk.Button(btns, text="−", width=2, command=self.zoom_out).pack(side="left", padx=1)
-        ttk.Button(btns, text="+", width=2, command=self.zoom_in).pack(side="left", padx=1)
-        ttk.Button(btns, text="Вписать", width=7, command=self.zoom_fit).pack(side="left", padx=1)
-        self.zoom_label = ttk.Label(btns, text="100%", width=6, anchor="e")
-        self.zoom_label.pack(side="left", padx=2)
-        self.info_label = ttk.Label(self, text="Нет изображения", style="Dim.TLabel")
-        self.info_label.pack(fill="x", padx=6)
 
-        body = ttk.Frame(self)
-        body.pack(fill="both", expand=True, padx=4, pady=4)
-        self.canvas = tk.Canvas(body, bg="#161a22", highlightthickness=1,
-                                highlightbackground="#2c3342")
+        btns = ttk.Frame(header, style="Panel.TFrame")
+        btns.pack(side="right")
+        ttk.Button(btns, text="−", width=2, style="Small.TButton",
+                   command=self.zoom_out).pack(side="left", padx=1)
+        self.zoom_label = ttk.Label(btns, text="—", width=6, anchor="center",
+                                    style="Badge.TLabel")
+        self.zoom_label.pack(side="left", padx=2)
+        ttk.Button(btns, text="+", width=2, style="Small.TButton",
+                   command=self.zoom_in).pack(side="left", padx=1)
+        ttk.Button(btns, text="Вписать", width=8, style="Small.TButton",
+                   command=self.zoom_fit).pack(side="left", padx=(4, 0))
+
+        self.info_label = ttk.Label(self, text="Нет изображения", style="Dim.TLabel")
+        self.info_label.pack(fill="x", pady=(0, 6))
+
+        body = ttk.Frame(self, style="Panel.TFrame")
+        body.pack(fill="both", expand=True)
+        self.canvas = tk.Canvas(body, bg="#10141c", highlightthickness=1,
+                                highlightbackground="#2f394d", bd=0)
         self.vbar = ttk.Scrollbar(body, orient="vertical", command=self.canvas.yview)
         self.hbar = ttk.Scrollbar(body, orient="horizontal", command=self.canvas.xview)
         self.canvas.configure(yscrollcommand=self.vbar.set, xscrollcommand=self.hbar.set)
@@ -42,7 +48,7 @@ class ImagePanel(ttk.Frame):
         self.hbar.grid(row=1, column=0, sticky="ew")
         body.rowconfigure(0, weight=1)
         body.columnconfigure(0, weight=1)
-        self.canvas.bind("<Configure>", lambda _e: self._render() if self._fit else None)
+        self.canvas.bind("<Configure>", lambda _e: self._render() if self._fit or self._pil is None else None)
         self.canvas.bind("<MouseWheel>", self._on_wheel)
         self.canvas.bind("<Button-4>", lambda _e: self.zoom_in())
         self.canvas.bind("<Button-5>", lambda _e: self.zoom_out())
@@ -53,7 +59,7 @@ class ImagePanel(ttk.Frame):
         if info:
             self.info_label.configure(text=info)
         elif pil_image is not None:
-            self.info_label.configure(text=f"{pil_image.width}×{pil_image.height}")
+            self.info_label.configure(text=f"Размер: {pil_image.width} × {pil_image.height} пикс.")
         else:
             self.info_label.configure(text="Нет изображения")
         self._render()
@@ -84,14 +90,22 @@ class ImagePanel(ttk.Frame):
 
     def _render(self) -> None:
         self.canvas.delete("all")
+        cw, ch = max(self.canvas.winfo_width(), 50), max(self.canvas.winfo_height(), 50)
         if self._pil is None:
             self.canvas.configure(scrollregion=(0, 0, 0, 0))
             self.zoom_label.configure(text="—")
+            self.canvas.create_text(
+                cw // 2,
+                ch // 2,
+                text="Изображение не загружено\nНажмите «📂 Открыть» в верхней панели",
+                fill="#566178",
+                font=("Segoe UI", 10),
+                justify="center",
+            )
             return
-        cw, ch = max(self.canvas.winfo_width(), 50), max(self.canvas.winfo_height(), 50)
         iw, ih = self._pil.size
         if self._fit:
-            scale = min(cw / iw, ch / ih)
+            scale = min((cw - 12) / iw, (ch - 12) / ih)
             scale = max(min(scale, 16.0), 0.02)
             self._zoom = scale
         dw, dh = max(1, int(iw * self._zoom)), max(1, int(ih * self._zoom))
@@ -100,6 +114,15 @@ class ImagePanel(ttk.Frame):
         except Exception:
             shown = self._pil.resize((dw, dh))
         self._photo = ImageTk.PhotoImage(shown)
-        self.canvas.create_image(0, 0, anchor="nw", image=self._photo)
-        self.canvas.configure(scrollregion=(0, 0, dw, dh))
+        ox = max(0, (cw - dw) // 2)
+        oy = max(0, (ch - dh) // 2)
+        self.canvas.create_rectangle(
+            ox - 1, oy - 1, ox + dw + 1, oy + dh + 1,
+            outline="#283142", width=1
+        )
+        self.canvas.create_image(ox, oy, anchor="nw", image=self._photo)
+        sr_w = max(cw, dw + ox * 2)
+        sr_h = max(ch, dh + oy * 2)
+        self.canvas.configure(scrollregion=(0, 0, sr_w, sr_h))
         self.zoom_label.configure(text=f"{int(self._zoom * 100)}%")
+

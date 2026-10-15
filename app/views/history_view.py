@@ -7,16 +7,30 @@ from tkinter import ttk
 
 class HistoryPanel(ttk.Frame):
     def __init__(self, parent, on_select=None) -> None:
-        super().__init__(parent)
+        super().__init__(parent, style="Panel.TFrame")
         self._on_select = on_select
-        ttk.Label(self, text="История обработки", style="PanelTitle.TLabel").pack(
-            anchor="w", padx=6, pady=(6, 2))
-        body = ttk.Frame(self)
-        body.pack(fill="both", expand=True, padx=6, pady=(0, 6))
-        self.listbox = tk.Listbox(body, bg="#161a22", fg="#e8eaf0",
-                                  selectbackground="#3b6fd4", selectforeground="white",
-                                  highlightthickness=1, highlightbackground="#2c3342",
-                                  activestyle="none")
+        header = ttk.Frame(self, style="Panel.TFrame")
+        header.pack(fill="x", padx=6, pady=(6, 4))
+        ttk.Label(header, text="История состояний", style="PanelTitle.TLabel").pack(side="left")
+        self.count_badge = ttk.Label(header, text="0", style="Badge.TLabel")
+        self.count_badge.pack(side="right")
+
+        body = ttk.Frame(self, style="Panel.TFrame")
+        body.pack(fill="both", expand=True, padx=6, pady=(0, 4))
+        self.listbox = tk.Listbox(
+            body,
+            bg="#10141c",
+            fg="#eef2f8",
+            font=("Segoe UI", 9),
+            selectbackground="#4f8cff",
+            selectforeground="#ffffff",
+            highlightthickness=1,
+            highlightbackground="#2f394d",
+            highlightcolor="#4f8cff",
+            bd=0,
+            relief="flat",
+            activestyle="none",
+        )
         bar = ttk.Scrollbar(body, orient="vertical", command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=bar.set)
         self.listbox.pack(side="left", fill="both", expand=True)
@@ -32,11 +46,13 @@ class HistoryPanel(ttk.Frame):
 
     def set_entries(self, entries: list[dict], active_index: int) -> None:
         self.listbox.delete(0, "end")
+        self.count_badge.configure(text=f"шагов: {len(entries)}")
         for i, e in enumerate(entries):
             mark = "● " if i == active_index else "   "
-            params = f" — {e['params']}" if e.get("params") else ""
-            self.listbox.insert("end", f"{mark}{i}: {e['label']}{params}")
+            params = f"  ({e['params']})" if e.get("params") else ""
+            self.listbox.insert("end", f" {mark}{i}. {e['label']}{params}")
         if 0 <= active_index < len(entries):
             self.listbox.selection_clear(0, "end")
             self.listbox.selection_set(active_index)
             self.listbox.see(active_index)
+

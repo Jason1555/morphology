@@ -57,27 +57,53 @@ class MainController:
         v.on("open_se_editor", self.open_se_editor)
         v.on("open_kernel_editor", self.open_kernel_editor)
 
+    CATEGORY_KEYS = ("morph", "filters", "conv", "history")
+
     def show_category(self, key: str) -> None:
+        if key not in self.CATEGORY_KEYS:
+            try:
+                self.view.set_status(f"Неизвестная категория: {key!r}.")
+            except tk.TclError:
+                pass
+            return
         self.category = key
-        self.view.set_category(key)
+        try:
+            self.view.set_category(key)
+        except tk.TclError:
+            return
         frame = self.view.clear_params()
         if key == "morph":
             self.morph_ctrl.build_panel(frame)
         elif key == "filters":
             self.filters_ctrl.build_panel(frame)
-        else:
+        elif key == "conv":
             self.conv_ctrl.build_panel(frame)
+        else:  # history
+            self.history_ctrl.build_panel(frame)
+        if key == "history":
+            self.history_ctrl.refresh_panel()
+        # Виджеты панели параметров пересоздаются через clear_params(),
+        # поэтому дубли исключены; историю переключение не трогает.
         try:
             self.morph_ctrl.sync_se_fields()
         except AttributeError:
             pass
-        self.conv_ctrl.refresh_info()
+        try:
+            self.conv_ctrl.refresh_info()
+        except (tk.TclError, ValueError, AttributeError):
+            pass
 
     def _to_pil(self, arr):
         if arr is None:
             return None
         return Image.fromarray(arr, mode="L")
     def refresh_images(self, status: str = "") -> None:
+        try:
+            exists = self.view.root.winfo_exists()
+        except tk.TclError:
+            return
+        if not exists:
+            return
         orig = self.image_model.original
         curr = self.image_model.current
         if orig is not None:
@@ -94,6 +120,16 @@ class MainController:
         self.view.set_undo_redo(self.history.can_undo(), self.history.can_redo())
         if status:
             self.view.set_status(status)
+
+    def _safe_after(self, func, *args) -> None:
+        """Запланировать колбэк в главном потоке; игнорировать закрытое окно."""
+        try:
+            if not self.view.root.winfo_exists():
+                self._busy = False
+                return
+            self.view.root.after(0, func, *args)
+        except tk.TclError:
+            self._busy = False
 
     def run_async(self, label: str, func, params: str = "") -> None:
         if self._busy:
@@ -112,19 +148,30 @@ class MainController:
             try:
                 result = func(src)
             except ValueError as exc:
-                self.view.root.after(0, lambda: self._finish_error(str(exc)))
+                self._safe_after(self._finish_error, str(exc))
                 return
             except Exception as exc:
-                self.view.root.after(0, lambda: self._finish_error(
-                    f"Неожиданная ошибка: {exc}"))
+                self._safe_after(self._finish_error,
+                                 f"Неожиданная ошибка: {exc}")
                 return
-            self.view.root.after(0, lambda: self._finish_ok(label, params, result))
+            self._safe_after(self._finish_ok, label, params, result)
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _alive(self) -> bool:
+        try:
+            return bool(self.view.root.winfo_exists())
+        except tk.TclError:
+            return False
+
     def _finish_ok(self, label, params, result) -> None:
         self._busy = False
-        self.view.set_busy(False)
+        if not self._alive():
+            return
+        try:
+            self.view.set_busy(False)
+        except tk.TclError:
+            return
         try:
             self.image_model.set_current(result)
             self.history.push(result, label, params)
@@ -136,8 +183,16 @@ class MainController:
 
     def _finish_error(self, message: str) -> None:
         self._busy = False
-        self.view.set_busy(False)
-        dialogs.show_error(self.view.root, message)
+        if not self._alive():
+            return
+        try:
+            self.view.set_busy(False)
+        except tk.TclError:
+            return
+        try:
+            dialogs.show_error(self.view.root, message)
+        except tk.TclError:
+            return
         self.refresh_images("Ошибка. История не изменена.")
 
     def open_se_editor(self) -> None:

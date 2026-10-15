@@ -188,11 +188,26 @@ class StructuringElementModel:
         self._fix_anchor()
 
     def shift(self, dx: int, dy: int) -> None:
+        """Обычный (не циклический) сдвиг маски с заполнением нулями.
+
+        Якорь остаётся на месте: двигается содержимое маски относительно
+        фиксированной опорной точки. Размеры маски сохраняются.
+        """
         try:
             dx, dy = int(dx), int(dy)
         except (TypeError, ValueError) as exc:
             raise ValueError("Сдвиг должен быть целым числом.") from exc
-        self._mask = np.roll(self._mask, shift=(dy, dx), axis=(0, 1)).copy()
+        if dx == 0 and dy == 0:
+            return
+        h, w = self._mask.shape
+        moved = np.zeros_like(self._mask)
+        src_y0, src_y1 = max(0, -dy), min(h, h - dy)
+        src_x0, src_x1 = max(0, -dx), min(w, w - dx)
+        dst_y0, dst_y1 = max(0, dy), min(h, h + dy)
+        dst_x0, dst_x1 = max(0, dx), min(w, w + dx)
+        if src_y1 > src_y0 and src_x1 > src_x0:
+            moved[dst_y0:dst_y1, dst_x0:dst_x1] = self._mask[src_y0:src_y1, src_x0:src_x1]
+        self._mask = moved
 
     def copy(self) -> "StructuringElementModel":
         clone = StructuringElementModel(self.width, self.height)

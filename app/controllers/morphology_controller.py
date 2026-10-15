@@ -22,51 +22,70 @@ class MorphologyController:
         self._op_titles = {k: t for k, t in MORPH_OPS}
 
     def build_panel(self, frame) -> None:
-        ttk.Label(frame, text="Операция:").pack(anchor="w", pady=(6, 0))
-        self.op_box = ttk.Combobox(frame, state="readonly", width=30,
+        # Карточка 1: выбор операции и итераций
+        op_card = ttk.Frame(frame, style="Card.TFrame", padding=10)
+        op_card.pack(fill="x", pady=(2, 8))
+        ttk.Label(op_card, text="Морфологическая операция",
+                  style="Section.TLabel").pack(anchor="w", pady=(0, 6))
+        self.op_box = ttk.Combobox(op_card, state="readonly", width=30,
                                    values=[t for _, t in MORPH_OPS])
         self.op_box.current(0)
-        self.op_box.pack(fill="x", pady=2)
-        ttk.Label(frame, text="Форма элемента:").pack(anchor="w", pady=(6, 0))
-        self.preset_box = ttk.Combobox(frame, state="readonly", width=30,
+        self.op_box.pack(fill="x", pady=(0, 8))
+
+        iter_row = ttk.Frame(op_card, style="Card.TFrame")
+        iter_row.pack(fill="x")
+        ttk.Label(iter_row, text="Итерации (эрозия / дилатация):",
+                  style="Card.TLabel").pack(side="left")
+        ttk.Spinbox(iter_row, from_=1, to=100, width=6,
+                    textvariable=self.iter_var).pack(side="right")
+
+        # Карточка 2: структурный элемент
+        se_card = ttk.Frame(frame, style="Card.TFrame", padding=10)
+        se_card.pack(fill="x", pady=(0, 8))
+        ttk.Label(se_card, text="Структурный элемент (SE)",
+                  style="Section.TLabel").pack(anchor="w", pady=(0, 6))
+
+        ttk.Label(se_card, text="Форма шаблона:", style="CardDim.TLabel").pack(anchor="w")
+        self.preset_box = ttk.Combobox(se_card, state="readonly", width=30,
                                        values=[t for _, t in PRESET_ORDER])
         self.preset_box.current(3)
-        self.preset_box.pack(fill="x", pady=2)
-        ttk.Button(frame, text="Применить форму к редактору",
-                   command=self._use_preset).pack(fill="x", pady=2)
-        ttk.Button(frame, text="Открыть редактор элемента...",
-                   command=self.app.open_se_editor).pack(fill="x", pady=2)
-        size_row = ttk.Frame(frame)
-        size_row.pack(fill="x", pady=(6, 0))
-        ttk.Label(size_row, text="W:").pack(side="left")
-        ttk.Entry(size_row, textvariable=self.width_var, width=5).pack(
-            side="left", padx=(2, 6))
-        ttk.Label(size_row, text="H:").pack(side="left")
-        ttk.Entry(size_row, textvariable=self.height_var, width=5).pack(
-            side="left", padx=(2, 6))
-        ttk.Button(size_row, text="Размер", command=self._apply_size).pack(
-            side="left", padx=2)
-        anch_row = ttk.Frame(frame)
-        anch_row.pack(fill="x", pady=(4, 0))
-        ttk.Label(anch_row, text="Якорь X:").pack(side="left")
-        ttk.Entry(anch_row, textvariable=self.ax_var, width=5).pack(
-            side="left", padx=(2, 6))
-        ttk.Label(anch_row, text="Y:").pack(side="left")
-        ttk.Entry(anch_row, textvariable=self.ay_var, width=5).pack(
-            side="left", padx=(2, 6))
-        ttk.Button(anch_row, text="Якорь", command=self._apply_anchor).pack(
-            side="left", padx=2)
-        ttk.Button(frame, text="Якорь в центр",
-                   command=self._center_anchor).pack(fill="x", pady=2)
-        ttk.Label(frame, text="Итерации (эрозия/дилатация):").pack(
-            anchor="w", pady=(6, 0))
-        ttk.Spinbox(frame, from_=1, to=100, width=6,
-                    textvariable=self.iter_var).pack(anchor="w", pady=2)
+        self.preset_box.pack(fill="x", pady=(2, 6))
+        ttk.Button(se_card, text="Заполнить по шаблону",
+                   command=self._use_preset).pack(fill="x", pady=(0, 4))
+        ttk.Button(se_card, text="⊞ Открыть интерактивный редактор...",
+                   command=self.app.open_se_editor).pack(fill="x", pady=(0, 8))
+
+        size_row = ttk.Frame(se_card, style="Card.TFrame")
+        size_row.pack(fill="x", pady=2)
+        ttk.Label(size_row, text="Размер W×H:", style="Card.TLabel").pack(side="left")
+        ttk.Button(size_row, text="Задать", style="Small.TButton",
+                   command=self._apply_size).pack(side="right", padx=(4, 0))
+        ttk.Entry(size_row, textvariable=self.height_var, width=5,
+                  justify="center").pack(side="right", padx=2)
+        ttk.Label(size_row, text="×", style="CardDim.TLabel").pack(side="right")
+        ttk.Entry(size_row, textvariable=self.width_var, width=5,
+                  justify="center").pack(side="right", padx=2)
+
+        anch_row = ttk.Frame(se_card, style="Card.TFrame")
+        anch_row.pack(fill="x", pady=(4, 6))
+        ttk.Label(anch_row, text="Якорь (X, Y):", style="Card.TLabel").pack(side="left")
+        ttk.Button(anch_row, text="Задать", style="Small.TButton",
+                   command=self._apply_anchor).pack(side="right", padx=(4, 0))
+        ttk.Entry(anch_row, textvariable=self.ay_var, width=5,
+                  justify="center").pack(side="right", padx=2)
+        ttk.Label(anch_row, text=",", style="CardDim.TLabel").pack(side="right")
+        ttk.Entry(anch_row, textvariable=self.ax_var, width=5,
+                  justify="center").pack(side="right", padx=2)
+
+        ttk.Button(se_card, text="Центрировать якорь",
+                   command=self._center_anchor).pack(fill="x", pady=(0, 6))
+
         self.se_info = tk.StringVar(value="")
-        ttk.Label(frame, textvariable=self.se_info, wraplength=300).pack(
-            anchor="w", pady=(6, 2))
-        ttk.Button(frame, text="Применить операцию", style="Accent.TButton",
-                   command=self.apply_operation).pack(fill="x", pady=6)
+        ttk.Label(se_card, textvariable=self.se_info, style="CardDim.TLabel",
+                  wraplength=290).pack(anchor="w")
+
+        ttk.Button(frame, text="▶ Применить операцию", style="Accent.TButton",
+                   command=self.apply_operation).pack(fill="x", pady=(2, 6))
         self.sync_se_fields()
     def sync_se_fields(self) -> None:
         se = self.app.se_model

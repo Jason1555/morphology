@@ -15,8 +15,9 @@ class StructuringElementEditor(tk.Toplevel):
     def __init__(self, parent, se: StructuringElementModel, on_accept=None) -> None:
         super().__init__(parent)
         self.title("Редактор структурного элемента")
-        self.geometry("900x640")
-        self.minsize(760, 520)
+        self.geometry("980x680")
+        self.minsize(800, 540)
+        self.configure(bg="#141821")
         self.transient(parent)
         self.grab_set()
         self.se = se.copy()
@@ -31,31 +32,36 @@ class StructuringElementEditor(tk.Toplevel):
         self._refresh_info()
 
     def _build_top(self) -> None:
-        top = ttk.Frame(self)
-        top.pack(fill="x", padx=8, pady=6)
+        top = ttk.Frame(self, padding=(12, 10))
+        top.configure(style="Panel.TFrame")
+        top.pack(fill="x", padx=10, pady=(10, 4))
         ttk.Label(top, text="Ширина:").pack(side="left")
         self.width_var = tk.StringVar(value=str(self.se.width))
         ttk.Spinbox(top, from_=1, to=101, width=5, textvariable=self.width_var).pack(
-            side="left", padx=(2, 8))
+            side="left", padx=(4, 10))
         ttk.Label(top, text="Высота:").pack(side="left")
         self.height_var = tk.StringVar(value=str(self.se.height))
         ttk.Spinbox(top, from_=1, to=101, width=5, textvariable=self.height_var).pack(
-            side="left", padx=(2, 8))
+            side="left", padx=(4, 10))
         ttk.Button(top, text="Применить размер", command=self._apply_size).pack(
             side="left", padx=4)
-        ttk.Label(top, text="Масштаб:").pack(side="left", padx=(10, 2))
-        ttk.Button(top, text="-", width=2, command=self._zoom_out).pack(side="left")
-        ttk.Button(top, text="+", width=2, command=self._zoom_in).pack(side="left")
+        ttk.Label(top, text="Масштаб:").pack(side="left", padx=(12, 4))
+        ttk.Button(top, text="−", width=3, command=self._zoom_out).pack(side="left", padx=1)
+        ttk.Button(top, text="+", width=3, command=self._zoom_in).pack(side="left", padx=1)
         self.info_var = tk.StringVar(value="")
-        ttk.Label(self, textvariable=self.info_var).pack(fill="x", padx=8)
+        info = ttk.Label(self, textvariable=self.info_var)
+        info.configure(style="Dim.TLabel")
+        info.pack(fill="x", padx=14, pady=(0, 4))
 
     def _build_middle(self) -> None:
         mid = ttk.Frame(self)
-        mid.pack(fill="both", expand=True, padx=8, pady=4)
+        mid.configure(style="Panel.TFrame")
+        mid.pack(fill="both", expand=True, padx=10, pady=4)
         cframe = ttk.Frame(mid)
+        cframe.configure(style="Panel.TFrame")
         cframe.pack(side="left", fill="both", expand=True)
-        self.canvas = tk.Canvas(cframe, bg="#10141b", highlightthickness=1,
-                                highlightbackground="#2c3342")
+        self.canvas = tk.Canvas(cframe, bg="#10141c", highlightthickness=1,
+                                highlightbackground="#2f394d")
         self.vbar = ttk.Scrollbar(cframe, orient="vertical", command=self.canvas.yview)
         self.hbar = ttk.Scrollbar(cframe, orient="horizontal", command=self.canvas.xview)
         self.canvas.configure(yscrollcommand=self.vbar.set, xscrollcommand=self.hbar.set)
@@ -67,71 +73,79 @@ class StructuringElementEditor(tk.Toplevel):
         self.canvas.bind("<Button-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<Motion>", self._on_hover)
-        side = ttk.Frame(mid, width=250)
-        side.pack(side="right", fill="y", padx=(8, 0))
+        side = ttk.Frame(mid, width=260)
+        side.configure(style="Card.TFrame")
+        side.pack(side="right", fill="y", padx=(10, 0))
         side.pack_propagate(False)
         self.side = side
-        ttk.Label(side, text="Инструмент:").pack(anchor="w", pady=(0, 2))
+        ttk.Label(side, text="Инструмент рисования:", style="Section.TLabel").pack(anchor="w", pady=(8, 4))
         for val, txt in (("toggle", "Переключение"), ("draw", "Рисование"),
                          ("erase", "Стирание"), ("anchor", "Якорь")):
-            ttk.Radiobutton(side, text=txt, value=val, variable=self.tool).pack(anchor="w")
-        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=6)
-        ttk.Label(side, text="Предустановка:").pack(anchor="w")
+            ttk.Radiobutton(side, text=txt, value=val, variable=self.tool).pack(
+                anchor="w", padx=10)
+        ttk.Separator(side, orient="horizontal").pack(fill="x", padx=10, pady=8)
+        ttk.Label(side, text="Предустановка:", style="CardDim.TLabel").pack(
+            anchor="w", padx=10)
         self.preset_var = tk.StringVar()
         self.preset_box = ttk.Combobox(side, textvariable=self.preset_var,
                                        state="readonly", width=26)
         self.preset_box["values"] = [t for _, t in PRESET_ORDER]
         self.preset_box.current(0)
-        self.preset_box.pack(fill="x", pady=2)
+        self.preset_box.pack(fill="x", padx=10, pady=2)
         ttk.Button(side, text="Применить форму", command=self._apply_preset).pack(
-            fill="x", pady=2)
-        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=6)
-        row1 = ttk.Frame(side)
-        row1.pack(fill="x", pady=1)
+            fill="x", padx=10, pady=2)
+        ttk.Separator(side, orient="horizontal").pack(fill="x", padx=10, pady=8)
+        row1 = ttk.Frame(side, style="Card.TFrame")
+        row1.pack(fill="x", padx=10, pady=1)
         ttk.Button(row1, text="Очистить", command=self._do_clear).pack(
             side="left", fill="x", expand=True, padx=1)
         ttk.Button(row1, text="Заполнить", command=self._do_fill).pack(
             side="left", fill="x", expand=True, padx=1)
         ttk.Button(side, text="Инвертировать", command=self._do_invert).pack(
-            fill="x", pady=1)
+            fill="x", padx=10, pady=1)
         ttk.Button(side, text="Якорь в центр", command=self._do_center).pack(
-            fill="x", pady=1)
-        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=6)
-        ttk.Label(side, text="Отразить / повернуть:").pack(anchor="w")
-        row2 = ttk.Frame(side)
-        row2.pack(fill="x", pady=1)
+            fill="x", padx=10, pady=1)
+        ttk.Separator(side, orient="horizontal").pack(fill="x", padx=10, pady=8)
+        ttk.Label(side, text="Отразить / повернуть:", style="CardDim.TLabel").pack(
+            anchor="w", padx=10)
+        row2 = ttk.Frame(side, style="Card.TFrame")
+        row2.pack(fill="x", padx=10, pady=1)
         ttk.Button(row2, text="Зеркало ↔", command=self._flip_h).pack(
             side="left", fill="x", expand=True, padx=1)
         ttk.Button(row2, text="Зеркало ↕", command=self._flip_v).pack(
             side="left", fill="x", expand=True, padx=1)
-        row3 = ttk.Frame(side)
-        row3.pack(fill="x", pady=1)
+        row3 = ttk.Frame(side, style="Card.TFrame")
+        row3.pack(fill="x", padx=10, pady=1)
         for ang in (90, 180, 270):
             ttk.Button(row3, text=f"{ang}°",
                        command=lambda a=ang: self._rotate(a)).pack(
                 side="left", fill="x", expand=True, padx=1)
-        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=6)
-        ttk.Label(side, text="Сдвиг (dx, dy):").pack(anchor="w")
-        srow = ttk.Frame(side)
-        srow.pack(fill="x", pady=2)
+        ttk.Separator(side, orient="horizontal").pack(fill="x", padx=10, pady=8)
+        ttk.Label(side, text="Сдвиг (dx, dy):", style="CardDim.TLabel").pack(
+            anchor="w", padx=10)
+        srow = ttk.Frame(side, style="Card.TFrame")
+        srow.pack(fill="x", padx=10, pady=2)
         self.dx_var = tk.StringVar(value="1")
         self.dy_var = tk.StringVar(value="0")
         ttk.Entry(srow, textvariable=self.dx_var, width=6).pack(side="left", padx=1)
         ttk.Entry(srow, textvariable=self.dy_var, width=6).pack(side="left", padx=1)
         ttk.Button(srow, text="Сдвинуть", command=self._shift).pack(side="left", padx=2)
-        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=6)
+        ttk.Separator(side, orient="horizontal").pack(fill="x", padx=10, pady=8)
         ttk.Button(side, text="Сохранить в файл...",
                    command=lambda: self.event_generate("<<SESave>>")).pack(
-            fill="x", pady=1)
+            fill="x", padx=10, pady=1)
         ttk.Button(side, text="Загрузить из файла...",
                    command=lambda: self.event_generate("<<SELoad>>")).pack(
-            fill="x", pady=1)
+            fill="x", padx=10, pady=1)
         self.cursor_var = tk.StringVar(value="Курсор: —")
-        ttk.Label(side, textvariable=self.cursor_var).pack(anchor="w", pady=(6, 0))
+        cur = ttk.Label(side, textvariable=self.cursor_var)
+        cur.configure(style="CardDim.TLabel")
+        cur.pack(anchor="w", padx=10, pady=(8, 10))
 
     def _build_bottom(self) -> None:
-        bot = ttk.Frame(self)
-        bot.pack(fill="x", padx=8, pady=8)
+        bot = ttk.Frame(self, padding=(12, 8))
+        bot.configure(style="Panel.TFrame")
+        bot.pack(fill="x", padx=10, pady=(0, 10))
         ttk.Button(bot, text="OK", style="Accent.TButton",
                    command=self._accept).pack(side="right", padx=4)
         ttk.Button(bot, text="Отмена", command=self.destroy).pack(side="right")
@@ -139,14 +153,19 @@ class StructuringElementEditor(tk.Toplevel):
     def _rebuild_grid(self) -> None:
         self.canvas.delete("all")
         self._rects = {}
-        s = self.cell_size
+        # Адаптивная клетка: интерфейс не раздувается даже на 101×101.
+        eff = self.cell_size
+        for dim in (self.se.width, self.se.height):
+            if dim * eff > 1600:
+                eff = max(4, 1600 // dim)
+        self._eff_cell = eff
         for y in range(self.se.height):
             for x in range(self.se.width):
-                x0, y0 = x * s, y * s
-                r = self.canvas.create_rectangle(x0, y0, x0 + s, y0 + s,
-                                                 outline="#3a4356", width=1)
+                x0, y0 = x * eff, y * eff
+                r = self.canvas.create_rectangle(x0, y0, x0 + eff, y0 + eff,
+                                                 outline="#2f394d", width=1)
                 self._rects[(x, y)] = r
-        self.canvas.configure(scrollregion=(0, 0, self.se.width * s, self.se.height * s))
+        self.canvas.configure(scrollregion=(0, 0, self.se.width * eff, self.se.height * eff))
         self._paint_all()
         self.width_var.set(str(self.se.width))
         self.height_var.set(str(self.se.height))
@@ -155,7 +174,7 @@ class StructuringElementEditor(tk.Toplevel):
         mask = self.se.mask
         ax, ay = self.se.anchor
         for (x, y), r in self._rects.items():
-            fill = "#4da3ff" if mask[y, x] else "#202634"
+            fill = "#4f8cff" if mask[y, x] else "#1c2331"
             self.canvas.itemconfigure(r, fill=fill)
         self._paint_anchor(ax, ay)
 
@@ -163,22 +182,23 @@ class StructuringElementEditor(tk.Toplevel):
         r = self._rects.get((x, y))
         if r is None:
             return
-        fill = "#4da3ff" if self.se.mask[y, x] else "#202634"
+        fill = "#4f8cff" if self.se.mask[y, x] else "#1c2331"
         self.canvas.itemconfigure(r, fill=fill)
         if (x, y) == self.se.anchor:
             self._paint_anchor(x, y)
 
     def _paint_anchor(self, ax: int, ay: int) -> None:
         self.canvas.delete("anchor_mark")
-        s = self.cell_size
+        s = getattr(self, "_eff_cell", self.cell_size)
         self.canvas.create_oval(ax * s + s * 0.2, ay * s + s * 0.2,
                                 ax * s + s * 0.8, ay * s + s * 0.8,
-                                fill="#ffcf40", outline="#7a5b00",
+                                fill="#ffca3a", outline="#8a6100",
                                 tags=("anchor_mark",))
 
     def _cell_from_event(self, event) -> tuple[int, int] | None:
-        x = int(self.canvas.canvasx(event.x) // self.cell_size)
-        y = int(self.canvas.canvasy(event.y) // self.cell_size)
+        s = getattr(self, "_eff_cell", self.cell_size)
+        x = int(self.canvas.canvasx(event.x) // s)
+        y = int(self.canvas.canvasy(event.y) // s)
         if 0 <= x < self.se.width and 0 <= y < self.se.height:
             return x, y
         return None

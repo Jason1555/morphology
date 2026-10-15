@@ -13,19 +13,20 @@ class ConvolutionController:
         self.info_var = tk.StringVar(value="")
 
     def build_panel(self, frame) -> None:
-        ttk.Label(frame, text="Пользовательская свёртка",
-                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(6, 0))
-        ttk.Label(frame, textvariable=self.info_var, wraplength=300).pack(
-            anchor="w", pady=4)
-        ttk.Button(frame, text="Открыть редактор ядра...",
-                   command=self.app.open_kernel_editor).pack(fill="x", pady=2)
-        ttk.Button(frame, text="Применить текущее ядро",
+        card = ttk.Frame(frame, style="Card.TFrame", padding=10)
+        card.pack(fill="x", pady=(2, 8))
+        ttk.Label(card, text="Пользовательская свёртка",
+                  style="Section.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Label(card, textvariable=self.info_var, style="Card.TLabel",
+                  wraplength=290).pack(anchor="w", pady=(0, 8))
+        ttk.Button(card, text="⌗ Открыть редактор ядра...",
+                   command=self.app.open_kernel_editor).pack(fill="x", pady=(0, 6))
+        ttk.Button(card, text="▶ Применить текущее ядро",
                    style="Accent.TButton",
-                   command=self.apply_kernel).pack(fill="x", pady=6)
-        ttk.Label(frame, wraplength=300, justify="left",
-                  text="Ядро, делитель, bias и граница задаются "
-                       "в редакторе ядра. Результат применяется "
-                       "к текущему изображению.").pack(anchor="w", pady=4)
+                   command=self.apply_kernel).pack(fill="x", pady=(0, 8))
+        ttk.Label(card, style="CardDim.TLabel", wraplength=290, justify="left",
+                  text="Матрица коэффициентов, делитель, смещение (bias) и "
+                       "режим обработки границ настраиваются в редакторе ядра.").pack(anchor="w")
         self.refresh_info()
 
     def refresh_info(self) -> None:

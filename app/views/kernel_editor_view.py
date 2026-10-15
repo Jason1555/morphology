@@ -12,8 +12,9 @@ class KernelEditorView(tk.Toplevel):
     def __init__(self, parent, kernel: KernelModel, on_accept=None) -> None:
         super().__init__(parent)
         self.title("Редактор ядра свёртки")
-        self.geometry("720x600")
-        self.minsize(620, 480)
+        self.geometry("780x620")
+        self.minsize(660, 500)
+        self.configure(bg="#141821")
         self.transient(parent)
         self.grab_set()
         self.kernel = kernel
@@ -28,19 +29,19 @@ class KernelEditorView(tk.Toplevel):
         self._rebuild_matrix()
         self._refresh_summary()
     def _build_top(self) -> None:
-        top = ttk.Frame(self)
-        top.pack(fill="x", padx=8, pady=6)
+        top = ttk.Frame(self, padding=(12, 10))
+        top.pack(fill="x", padx=10, pady=(10, 4))
         ttk.Label(top, text="Строки:").pack(side="left")
         self.rows_var = tk.StringVar(value=str(self.kernel.rows))
         ttk.Spinbox(top, from_=1, to=31, width=4,
-                    textvariable=self.rows_var).pack(side="left", padx=(2, 8))
+                    textvariable=self.rows_var).pack(side="left", padx=(4, 10))
         ttk.Label(top, text="Столбцы:").pack(side="left")
         self.cols_var = tk.StringVar(value=str(self.kernel.cols))
         ttk.Spinbox(top, from_=1, to=31, width=4,
-                    textvariable=self.cols_var).pack(side="left", padx=(2, 8))
+                    textvariable=self.cols_var).pack(side="left", padx=(4, 10))
         ttk.Button(top, text="Применить размер",
                    command=self._apply_size).pack(side="left", padx=4)
-        ttk.Label(top, text="Предустановка:").pack(side="left", padx=(10, 2))
+        ttk.Label(top, text="Предустановка:").pack(side="left", padx=(12, 4))
         self.preset_names = list(KERNEL_PRESETS.keys())
         self.preset_box = ttk.Combobox(top, state="readonly", width=22)
         self.preset_box["values"] = [KERNEL_PRESETS[k][0] for k in self.preset_names]
@@ -51,12 +52,12 @@ class KernelEditorView(tk.Toplevel):
 
     def _build_mid(self) -> None:
         mid = ttk.Frame(self)
-        mid.pack(fill="both", expand=True, padx=8, pady=4)
+        mid.pack(fill="both", expand=True, padx=10, pady=4)
         mframe = ttk.Frame(mid)
         mframe.pack(side="left", fill="both", expand=True)
         self.holder = mframe
-        self.mcanvas = tk.Canvas(mframe, bg="#10141b", highlightthickness=1,
-                                 highlightbackground="#2c3342")
+        self.mcanvas = tk.Canvas(mframe, bg="#10141c", highlightthickness=1,
+                                 highlightbackground="#2f394d")
         self.mv = ttk.Scrollbar(mframe, orient="vertical", command=self.mcanvas.yview)
         self.mh = ttk.Scrollbar(mframe, orient="horizontal", command=self.mcanvas.xview)
         self.mcanvas.configure(yscrollcommand=self.mv.set, xscrollcommand=self.mh.set)
@@ -72,8 +73,8 @@ class KernelEditorView(tk.Toplevel):
 
     def _build_side(self) -> None:
         mid_children = self.mcanvas.master.master
-        side = ttk.Frame(mid_children, width=230)
-        side.pack(side="right", fill="y", padx=(8, 0))
+        side = ttk.Frame(mid_children, width=240)
+        side.pack(side="right", fill="y", padx=(10, 0))
         side.pack_propagate(False)
         ttk.Label(side, text="Делитель (divisor):").pack(anchor="w")
         self.divisor_var = tk.StringVar(value=str(self.kernel.divisor))
@@ -82,28 +83,28 @@ class KernelEditorView(tk.Toplevel):
         ttk.Checkbutton(side, text="Автонормализация (сумма)",
                         variable=self.auto_var,
                         command=self._refresh_summary).pack(anchor="w", pady=2)
-        ttk.Label(side, text="Смещение (bias):").pack(anchor="w", pady=(6, 0))
+        ttk.Label(side, text="Смещение (bias):").pack(anchor="w", pady=(8, 0))
         self.bias_var = tk.StringVar(value=str(self.kernel.bias))
         ttk.Entry(side, textvariable=self.bias_var).pack(fill="x", pady=2)
-        ttk.Label(side, text="Граница:").pack(anchor="w", pady=(6, 0))
+        ttk.Label(side, text="Граница:").pack(anchor="w", pady=(8, 0))
         self.border_box = ttk.Combobox(side, state="readonly", width=26)
         self.border_box["values"] = list(BORDER_TITLES.values())
         order = list(BORDER_TITLES.keys())
         self.border_box.current(order.index(self.kernel.border))
         self.border_box.pack(fill="x", pady=2)
-        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=6)
+        ttk.Separator(side, orient="horizontal").pack(fill="x", pady=8)
         ttk.Button(side, text="Очистить (нули)",
                    command=self._do_clear).pack(fill="x", pady=1)
         ttk.Button(side, text="Заполнить единицами",
                    command=self._do_ones).pack(fill="x", pady=1)
-        ttk.Label(side, textvariable=self.summary_var, wraplength=215).pack(
-            anchor="w", pady=(8, 0))
+        ttk.Label(side, textvariable=self.summary_var, wraplength=225).pack(
+            anchor="w", pady=(10, 0))
 
     def _build_bottom(self) -> None:
         ttk.Label(self, textvariable=self.error_var,
-                  foreground="#ff7b7b").pack(fill="x", padx=8)
-        bot = ttk.Frame(self)
-        bot.pack(fill="x", padx=8, pady=8)
+                  foreground="#ff8a8a").pack(fill="x", padx=12)
+        bot = ttk.Frame(self, padding=(12, 8))
+        bot.pack(fill="x", padx=10, pady=(0, 10))
         ttk.Button(bot, text="Применить", style="Accent.TButton",
                    command=self._accept).pack(side="right", padx=4)
         ttk.Button(bot, text="Отмена", command=self.destroy).pack(side="right")
