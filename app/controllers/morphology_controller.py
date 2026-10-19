@@ -140,11 +140,13 @@ class MorphologyController:
         op_keys = [k for k, _ in MORPH_OPS]
         cur = self.op_box.current()
         op = op_keys[cur] if 0 <= cur < len(op_keys) else "erosion"
-        se = self.app.se_model
+        # Capture Tk variables and mutable model state on the UI thread.
+        se = self.app.se_model.copy()
+        iterations = self.iter_var.get()
         desc = (f"SE {se.width}×{se.height}, якорь {se.anchor}, "
-                f"итераций {self.iter_var.get()}")
+                f"итераций {iterations}")
         self.app.run_async(
             f"Морфология: {self._op_titles.get(op, op)}",
-            lambda src: self.app.morph_model.apply(src, op, se, self.iter_var.get()),
+            lambda src: self.app.morph_model.apply(src, op, se, iterations),
             desc)
 

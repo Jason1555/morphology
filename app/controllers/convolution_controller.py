@@ -39,15 +39,15 @@ class ConvolutionController:
         if not self.app.image_model.has_image:
             dialogs.show_error(self.app.view.root, "Сначала откройте изображение.")
             return
-        km = self.app.kernel_model
+        # Snapshot prevents edits in the kernel editor from changing an in-flight job.
+        km = self.app.kernel_model.copy()
+        try:
+            info = km.summary()
+        except ValueError as exc:
+            dialogs.show_error(self.app.view.root, str(exc))
+            return
 
         def job(src):
             return self.app.conv_model.apply_kernel_model(src, km)[0]
 
-        try:
-            _, info = self.app.conv_model.apply_kernel_model(
-                self.app.image_model.require_current_copy(), km)
-        except ValueError as exc:
-            dialogs.show_error(self.app.view.root, str(exc))
-            return
         self.app.run_async("Свёртка: пользовательское ядро", job, info)

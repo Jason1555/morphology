@@ -1,9 +1,11 @@
 """Главный контроллер: связывает Model и View, потоки, редакторы, категории."""
 from __future__ import annotations
 
+import queue
 import threading
 import tkinter as tk
 
+import numpy as np
 from PIL import Image
 
 from app.controllers.convolution_controller import ConvolutionController
@@ -41,9 +43,13 @@ class MainController:
         self.conv_ctrl = ConvolutionController(self)
         self.category = "morph"
         self._busy = False
+        self._operation_source: np.ndarray | None = None
+        self._worker_queue: queue.Queue[tuple] = queue.Queue()
         self._bind()
         self.show_category("morph")
         self.refresh_images("Готово. Откройте изображение.")
+        # Poll from Tk's main thread; workers only put plain data in the queue.
+        self.view.root.after(40, self._poll_worker_results)
 
     def _bind(self) -> None:
         v = self.view
@@ -117,19 +123,33 @@ class MainController:
         else:
             self.view.result_panel.set_image(None)
         self.view.history_panel.set_entries(self.history.entries(), self.history.index)
+        try:
+            self.history_ctrl.refresh_panel()
+        except (AttributeError, tk.TclError):
+            pass
         self.view.set_undo_redo(self.history.can_undo(), self.history.can_redo())
         if status:
             self.view.set_status(status)
 
-    def _safe_after(self, func, *args) -> None:
-        """Запланировать колбэк в главном потоке; игнорировать закрытое окно."""
+    def _poll_worker_results(self) -> None:
+        """Consume worker results on Tk's main thread only."""
         try:
             if not self.view.root.winfo_exists():
-                self._busy = False
                 return
-            self.view.root.after(0, func, *args)
+            while True:
+                try:
+                    message = self._worker_queue.get_nowait()
+                except queue.Empty:
+                    break
+                if message[0] == "ok":
+                    _, label, params, result = message
+                    self._finish_ok(label, params, result)
+                elif message[0] == "error":
+                    self._finish_error(message[1])
+            self.view.root.after(40, self._poll_worker_results)
         except tk.TclError:
-            self._busy = False
+            # The window may have been closed between the existence check and after().
+            return
 
     def run_async(self, label: str, func, params: str = "") -> None:
         if self._busy:
@@ -144,17 +164,18 @@ class MainController:
         self.view.set_busy(True, f"{label}...")
         self.view.set_status(f"{label}...")
 
+        self._operation_source = src.copy()
+
         def worker() -> None:
             try:
                 result = func(src)
             except ValueError as exc:
-                self._safe_after(self._finish_error, str(exc))
+                self._worker_queue.put(("error", str(exc)))
                 return
             except Exception as exc:
-                self._safe_after(self._finish_error,
-                                 f"Неожиданная ошибка: {exc}")
+                self._worker_queue.put(("error", f"Неожиданная ошибка: {exc}"))
                 return
-            self._safe_after(self._finish_ok, label, params, result)
+            self._worker_queue.put(("ok", label, params, result))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -167,10 +188,22 @@ class MainController:
     def _finish_ok(self, label, params, result) -> None:
         self._busy = False
         if not self._alive():
+            self._operation_source = None
             return
         try:
             self.view.set_busy(False)
         except tk.TclError:
+            self._operation_source = None
+            return
+        source_snapshot = self._operation_source
+        self._operation_source = None
+        current = self.image_model.current
+        if source_snapshot is not None and (
+            current is None or not np.array_equal(current, source_snapshot)
+        ):
+            # A menu/history action changed the image while computation was running.
+            # Never apply a stale result to a different current image.
+            self.refresh_images("Результат не применён: изображение изменилось во время обработки.")
             return
         try:
             self.image_model.set_current(result)
@@ -183,6 +216,7 @@ class MainController:
 
     def _finish_error(self, message: str) -> None:
         self._busy = False
+        self._operation_source = None
         if not self._alive():
             return
         try:

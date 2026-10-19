@@ -1,4 +1,4 @@
-"""Виджет просмотра изображения: масштаб, прокрутка, пропорции (только View)."""
+"""Компонент просмотра grayscale-изображения. Только View."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -7,122 +7,322 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 
 
+BG = "#151a23"
+CANVAS_BG = "#0b0e13"
+BORDER = "#303847"
+TEXT = "#edf1f7"
+MUTED = "#929cad"
+ACCENT = "#7c9cff"
+
+
 class ImagePanel(ttk.Frame):
-    """Панель с заголовком, Canvas + скроллбары и кнопками масштаба."""
+    """Панель изображения с масштабированием и прокруткой."""
 
     def __init__(self, parent, title: str) -> None:
-        super().__init__(parent, style="Panel.TFrame", padding=(10, 8))
+        super().__init__(
+            parent,
+            style="Panel.TFrame",
+            padding=(10, 10),
+        )
+
         self._pil: Image.Image | None = None
         self._photo: ImageTk.PhotoImage | None = None
-        self._zoom: float = 1.0
-        self._fit: bool = True
+        self._zoom = 1.0
+        self._fit = True
+        self._render_job = None
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(2, weight=1)
 
         header = ttk.Frame(self, style="Panel.TFrame")
-        header.pack(fill="x", pady=(0, 4))
-        ttk.Label(header, text=title, style="PanelTitle.TLabel").pack(side="left")
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 7))
+        header.columnconfigure(0, weight=1)
 
-        btns = ttk.Frame(header, style="Panel.TFrame")
-        btns.pack(side="right")
-        ttk.Button(btns, text="−", width=2, style="Small.TButton",
-                   command=self.zoom_out).pack(side="left", padx=1)
-        self.zoom_label = ttk.Label(btns, text="—", width=6, anchor="center",
-                                    style="Badge.TLabel")
-        self.zoom_label.pack(side="left", padx=2)
-        ttk.Button(btns, text="+", width=2, style="Small.TButton",
-                   command=self.zoom_in).pack(side="left", padx=1)
-        ttk.Button(btns, text="Вписать", width=8, style="Small.TButton",
-                   command=self.zoom_fit).pack(side="left", padx=(4, 0))
+        ttk.Label(
+            header,
+            text=title,
+            style="Title.TLabel",
+        ).grid(row=0, column=0, sticky="w")
 
-        self.info_label = ttk.Label(self, text="Нет изображения", style="Dim.TLabel")
-        self.info_label.pack(fill="x", pady=(0, 6))
+        controls = ttk.Frame(header, style="Panel.TFrame")
+        controls.grid(row=0, column=1, sticky="e")
+
+        ttk.Button(
+            controls,
+            text="−",
+            width=3,
+            style="Small.TButton",
+            command=self.zoom_out,
+        ).pack(side="left", padx=1)
+
+        self.zoom_label = ttk.Label(
+            controls,
+            text="Вписать",
+            style="Muted.TLabel",
+            width=7,
+            anchor="center",
+        )
+        self.zoom_label.pack(side="left", padx=3)
+
+        ttk.Button(
+            controls,
+            text="+",
+            width=3,
+            style="Small.TButton",
+            command=self.zoom_in,
+        ).pack(side="left", padx=1)
+
+        ttk.Button(
+            controls,
+            text="Вписать",
+            style="Small.TButton",
+            command=self.zoom_fit,
+        ).pack(side="left", padx=(5, 0))
+
+        info_row = ttk.Frame(self, style="Panel.TFrame")
+        info_row.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        info_row.columnconfigure(0, weight=1)
+
+        self.info_label = ttk.Label(
+            info_row,
+            text="Изображение не загружено",
+            style="Muted.TLabel",
+        )
+        self.info_label.grid(row=0, column=0, sticky="w")
+
+        self.mode_label = ttk.Label(
+            info_row,
+            text="GRAY · 8 BIT",
+            style="Muted.TLabel",
+        )
+        self.mode_label.grid(row=0, column=1, sticky="e")
 
         body = ttk.Frame(self, style="Panel.TFrame")
-        body.pack(fill="both", expand=True)
-        self.canvas = tk.Canvas(body, bg="#10141c", highlightthickness=1,
-                                highlightbackground="#2f394d", bd=0)
-        self.vbar = ttk.Scrollbar(body, orient="vertical", command=self.canvas.yview)
-        self.hbar = ttk.Scrollbar(body, orient="horizontal", command=self.canvas.xview)
-        self.canvas.configure(yscrollcommand=self.vbar.set, xscrollcommand=self.hbar.set)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        self.vbar.grid(row=0, column=1, sticky="ns")
-        self.hbar.grid(row=1, column=0, sticky="ew")
+        body.grid(row=2, column=0, sticky="nsew")
         body.rowconfigure(0, weight=1)
         body.columnconfigure(0, weight=1)
-        self.canvas.bind("<Configure>", lambda _e: self._render() if self._fit or self._pil is None else None)
+
+        self.canvas = tk.Canvas(
+            body,
+            bg=CANVAS_BG,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            borderwidth=0,
+            relief="flat",
+        )
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+
+        self.vbar = ttk.Scrollbar(
+            body,
+            orient="vertical",
+            command=self.canvas.yview,
+        )
+        self.vbar.grid(row=0, column=1, sticky="ns")
+
+        self.hbar = ttk.Scrollbar(
+            body,
+            orient="horizontal",
+            command=self.canvas.xview,
+        )
+        self.hbar.grid(row=1, column=0, sticky="ew")
+
+        self.canvas.configure(
+            xscrollcommand=self.hbar.set,
+            yscrollcommand=self.vbar.set,
+        )
+
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
         self.canvas.bind("<MouseWheel>", self._on_wheel)
         self.canvas.bind("<Button-4>", lambda _e: self.zoom_in())
         self.canvas.bind("<Button-5>", lambda _e: self.zoom_out())
 
-    # --- API для контроллера ---
-    def set_image(self, pil_image: "Image.Image | None", info: str = "") -> None:
+        self.canvas.bind("<ButtonPress-2>", self._pan_start)
+        self.canvas.bind("<B2-Motion>", self._pan_move)
+        self.canvas.bind("<ButtonPress-3>", self._pan_start)
+        self.canvas.bind("<B3-Motion>", self._pan_move)
+
+        self._show_placeholder()
+
+    def set_image(
+        self,
+        pil_image: Image.Image | None,
+        info: str = "",
+    ) -> None:
+        """Установить изображение из контроллера."""
         self._pil = pil_image
-        if info:
-            self.info_label.configure(text=info)
-        elif pil_image is not None:
-            self.info_label.configure(text=f"Размер: {pil_image.width} × {pil_image.height} пикс.")
-        else:
-            self.info_label.configure(text="Нет изображения")
-        self._render()
+        self._photo = None
+
+        if pil_image is None:
+            self._zoom = 1.0
+            self._fit = True
+            self.info_label.configure(text="Изображение не загружено")
+            self.mode_label.configure(text="GRAY · 8 BIT")
+            self._show_placeholder()
+            self.zoom_label.configure(text="Вписать")
+            return
+
+        self.info_label.configure(
+            text=info or (
+                f"{pil_image.width} × {pil_image.height} пикс."
+            )
+        )
+        self.mode_label.configure(text="GRAYSCALE")
+        self._fit = True
+        self._schedule_render()
 
     def zoom_in(self) -> None:
+        if self._pil is None:
+            return
         self._fit = False
         self._zoom = min(self._zoom * 1.25, 16.0)
         self._render()
 
     def zoom_out(self) -> None:
+        if self._pil is None:
+            return
         self._fit = False
-        self._zoom = max(self._zoom / 1.25, 0.05)
+        self._zoom = max(self._zoom / 1.25, 0.03)
         self._render()
 
     def zoom_fit(self) -> None:
         self._fit = True
         self._render()
 
-    # --- внутреннее ---
+    def _on_canvas_resize(self, _event=None) -> None:
+        if self._fit or self._pil is None:
+            self._schedule_render()
+
+    def _schedule_render(self) -> None:
+        if self._render_job is not None:
+            try:
+                self.after_cancel(self._render_job)
+            except tk.TclError:
+                pass
+        try:
+            self._render_job = self.after_idle(self._render)
+        except tk.TclError:
+            self._render_job = None
+
     def _on_wheel(self, event) -> None:
-        if event.state & 0x4:  # Ctrl+колесо — масштаб
+        # Ctrl + колесо меняет масштаб; обычное колесо прокручивает изображение.
+        if event.state & 0x4:
             if event.delta > 0:
                 self.zoom_in()
             else:
                 self.zoom_out()
-        else:
-            self.canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+            return
+
+        direction = -1 if event.delta > 0 else 1
+        self.canvas.yview_scroll(direction * 3, "units")
+
+    def _pan_start(self, event) -> None:
+        self.canvas.scan_mark(event.x, event.y)
+
+    def _pan_move(self, event) -> None:
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+    def _show_placeholder(self) -> None:
+        self.canvas.delete("all")
+        self.canvas.configure(scrollregion=(0, 0, 1, 1))
+
+        width = max(self.canvas.winfo_width(), 100)
+        height = max(self.canvas.winfo_height(), 100)
+
+        self.canvas.create_text(
+            width // 2,
+            height // 2 - 14,
+            text="Нет изображения",
+            fill=TEXT,
+            font=("Segoe UI", 13, "bold"),
+            justify="center",
+        )
+        self.canvas.create_text(
+            width // 2,
+            height // 2 + 15,
+            text="Откройте файл, чтобы начать работу",
+            fill=MUTED,
+            font=("Segoe UI", 10),
+            justify="center",
+        )
 
     def _render(self) -> None:
+        self._render_job = None
         self.canvas.delete("all")
-        cw, ch = max(self.canvas.winfo_width(), 50), max(self.canvas.winfo_height(), 50)
-        if self._pil is None:
-            self.canvas.configure(scrollregion=(0, 0, 0, 0))
-            self.zoom_label.configure(text="—")
-            self.canvas.create_text(
-                cw // 2,
-                ch // 2,
-                text="Изображение не загружено\nНажмите «📂 Открыть» в верхней панели",
-                fill="#566178",
-                font=("Segoe UI", 10),
-                justify="center",
-            )
-            return
-        iw, ih = self._pil.size
-        if self._fit:
-            scale = min((cw - 12) / iw, (ch - 12) / ih)
-            scale = max(min(scale, 16.0), 0.02)
-            self._zoom = scale
-        dw, dh = max(1, int(iw * self._zoom)), max(1, int(ih * self._zoom))
-        try:
-            shown = self._pil.resize((dw, dh), Image.NEAREST if self._zoom >= 1 else Image.LANCZOS)
-        except Exception:
-            shown = self._pil.resize((dw, dh))
-        self._photo = ImageTk.PhotoImage(shown)
-        ox = max(0, (cw - dw) // 2)
-        oy = max(0, (ch - dh) // 2)
-        self.canvas.create_rectangle(
-            ox - 1, oy - 1, ox + dw + 1, oy + dh + 1,
-            outline="#283142", width=1
-        )
-        self.canvas.create_image(ox, oy, anchor="nw", image=self._photo)
-        sr_w = max(cw, dw + ox * 2)
-        sr_h = max(ch, dh + oy * 2)
-        self.canvas.configure(scrollregion=(0, 0, sr_w, sr_h))
-        self.zoom_label.configure(text=f"{int(self._zoom * 100)}%")
 
+        image = self._pil
+        if image is None:
+            self._show_placeholder()
+            return
+
+        canvas_width = max(self.canvas.winfo_width(), 80)
+        canvas_height = max(self.canvas.winfo_height(), 80)
+        image_width, image_height = image.size
+
+        if self._fit:
+            available_width = max(1, canvas_width - 28)
+            available_height = max(1, canvas_height - 28)
+
+            self._zoom = min(
+                available_width / image_width,
+                available_height / image_height,
+                16.0,
+            )
+            self._zoom = max(self._zoom, 0.01)
+
+        display_width = max(
+            1, round(image_width * self._zoom)
+        )
+        display_height = max(
+            1, round(image_height * self._zoom)
+        )
+
+        resampling = (
+            Image.Resampling.NEAREST
+            if self._zoom >= 1.0
+            else Image.Resampling.LANCZOS
+        )
+
+        try:
+            shown = image.resize(
+                (display_width, display_height),
+                resampling,
+            )
+        except (ValueError, OSError):
+            shown = image.resize(
+                (display_width, display_height)
+            )
+
+        self._photo = ImageTk.PhotoImage(shown)
+
+        offset_x = max(12, (canvas_width - display_width) // 2)
+        offset_y = max(12, (canvas_height - display_height) // 2)
+
+        self.canvas.create_rectangle(
+            offset_x - 1,
+            offset_y - 1,
+            offset_x + display_width + 1,
+            offset_y + display_height + 1,
+            outline=BORDER,
+        )
+        self.canvas.create_image(
+            offset_x,
+            offset_y,
+            anchor="nw",
+            image=self._photo,
+        )
+
+        scroll_width = max(
+            canvas_width,
+            display_width + offset_x * 2,
+        )
+        scroll_height = max(
+            canvas_height,
+            display_height + offset_y * 2,
+        )
+
+        self.canvas.configure(
+            scrollregion=(0, 0, scroll_width, scroll_height)
+        )
+        self.zoom_label.configure(
+            text=f"{round(self._zoom * 100)}%"
+        )

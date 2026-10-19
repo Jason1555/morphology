@@ -123,6 +123,16 @@ class KernelModel:
         d, how = self.effective_divisor()
         return (self._matrix / d).astype(np.float64), d, how
 
+    def copy(self) -> "KernelModel":
+        """Return an independent snapshot suitable for background processing."""
+        clone = KernelModel(self.rows, self.cols)
+        clone._matrix = self._matrix.copy()
+        clone._divisor = self._divisor
+        clone._auto_normalize = self._auto_normalize
+        clone._bias = self._bias
+        clone._border = self._border
+        return clone
+
     def summary(self) -> str:
         d, how = self.effective_divisor()
         return (f"Ядро {self.rows}x{self.cols}, сумма={float(self._matrix.sum()):.4g}, "
